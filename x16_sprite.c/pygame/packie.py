@@ -6,7 +6,7 @@ from pygame.locals import *
 import os
 
 """
-    Packie 1.0 - Pygame-emulation of a CX16 BASIC sprite example.
+    Packie 1.1 - Pygame-emulation of a CX16 BASIC sprite example.
 
     Copyright (C) 2023 Hauke Lubenow
 
@@ -81,6 +81,77 @@ COLORS = {"cxblue"       : (0, 0, 170),
           "cxwhite"      : (255, 255, 255),
           "packieyellow" : (238, 238, 119),
           "transparent"  : (0, 0, 0, 0) }
+
+
+class InputHandler:
+
+    def __init__(self, hasjoystick):
+        self.hasjoystick = hasjoystick
+        self.joystick = {}
+        if self.hasjoystick:
+            self.initJoystick()
+        self.initKeys()
+
+    def initJoystick(self):
+        self.js = pygame.joystick.Joystick(0)
+        self.js.init()
+        for i in ("left", "right", "up", "down", "firing"):
+            self.joystick[i] = False
+
+    def initKeys(self):
+        self.keys_ = {}
+        for i in (pygame.K_LEFT, pygame.K_RIGHT,
+                  pygame.K_UP, pygame.K_DOWN, pygame.K_LCTRL,
+                  pygame.K_q, pygame.K_ESCAPE):
+            self.keys_[i] = False
+
+    def processEvents(self):
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                for i in self.keys_:
+                    if event.key == i:
+                        self.keys_[i] = True
+            if event.type == pygame.KEYUP:
+                for i in self.keys_:
+                    if event.key == i:
+                        self.keys_[i] = False
+            if self.hasjoystick:
+                if event.type == pygame.JOYBUTTONDOWN:
+                    self.joystick["firing"] = True
+                if event.type == pygame.JOYBUTTONUP:
+                    self.joystick["firing"] = False
+                if event.type == pygame.JOYAXISMOTION:
+                    # Joystick pushed:
+                    if event.axis == 0 and int(event.value) == -1:
+                        self.joystick["left"] = True
+                    if event.axis == 0 and int(event.value) == 1:
+                        self.joystick["right"] = True
+                    if event.axis == 1 and int(event.value) == -1:
+                        self.joystick["up"] = True
+                    if event.axis == 1 and int(event.value) == 1:
+                        self.joystick["down"] = True
+                    # Joystick released:
+                    if event.axis == 0 and int(event.value) == 0:
+                        self.joystick["left"] = False
+                        self.joystick["right"] = False
+                    if event.axis == 1 and int(event.value) == 0:
+                        self.joystick["up"] = False
+                        self.joystick["down"] = False
+        actions = []
+        if self.keys_[pygame.K_LEFT] or self.hasjoystick and self.joystick["left"]:
+            actions.append("left")
+        if self.keys_[pygame.K_RIGHT] or self.hasjoystick and self.joystick["right"]:
+            actions.append("right")
+        if self.keys_[pygame.K_UP] or self.hasjoystick and self.joystick["up"]:
+            actions.append("up")
+        if self.keys_[pygame.K_DOWN] or self.hasjoystick and self.joystick["down"]:
+            actions.append("down")
+        if self.keys_[pygame.K_LCTRL] or self.hasjoystick and self.joystick["firing"]:
+            actions.append("firing")
+        if self.keys_[pygame.K_q] or self.keys_[pygame.K_ESCAPE]:
+            actions.append("quit")
+        return actions
+
 
 class ImageCreator:
 
@@ -242,6 +313,7 @@ class Main:
         self.screen = pygame.display.set_mode((1084, 480))
         pygame.display.set_caption('Packie')
         pygame.init()
+        self.ih = InputHandler(True)
         self.initSprites()
         self.clock   = pygame.time.Clock()
         self.running = True
@@ -252,7 +324,7 @@ class Main:
 
             self.screen.fill(COLORS["cxblue"])
             self.packie.draw(self.screen)
-            if self.processEvents() == "quit":
+            if self.checkInput() == "quit":
                 return
             pygame.display.flip()
 
@@ -260,23 +332,22 @@ class Main:
         self.packie = Packie()
         self.packie.setPosition(500, 180)
 
-    def processEvents(self):
-        pygame.event.pump()
-        pressed = pygame.key.get_pressed()
-        if pressed[K_LEFT]:
+    def checkInput(self):
+        actions = self.ih.processEvents()
+        if "left" in actions:
             self.packie.moveLeft()
             return
-        if pressed[K_RIGHT]:
+        if "right" in actions:
             self.packie.moveRight()
             return
-        if pressed[K_UP]:
+        if "up" in actions:
             self.packie.moveUp()
             return
-        if pressed[K_DOWN]:
+        if "down" in actions:
             self.packie.moveDown()
             return
-        if pressed[K_q]:
-            quit()
+        if "quit" in actions:
+            pygame.quit()
             return "quit"
         return 0
 
