@@ -6,7 +6,7 @@ from pygame.locals import *
 import os
 
 """
-    Packie 1.1 - Pygame-emulation of a CX16 BASIC sprite example.
+    Packie 1.2 - Pygame-emulation of a CX16 BASIC sprite example.
 
     Copyright (C) 2023 Hauke Lubenow
 
@@ -26,67 +26,31 @@ import os
 
 SCALEFACTOR = 2
 
-spritedata = (("0000001111000000",
-               "0000111111110000",
-               "0011111111111100",
-               "0011111111111100",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "1111111111111111",
-               "0011111111111100",
-               "0011111111111100",
-               "0000111111110000",
-               "0000001111000000"),
-
-              ("0000001111000000",
-               "0000001111000000",
-               "0000111111110000",
-               "0011111111111100",
-               "0011111111111100",
-               "1111111111111111",
-               "1111111111110000",
-               "1111111111000000",
-               "1111111100000000",
-               "1111111100000000",
-               "1111111111000000",
-               "1111111111110000",
-               "1111111111111111",
-               "0011111111111100",
-               "0000111111110000",
-               "0000001111000000"),
- 
-              ("0000001111000000",
-               "0000111111110000",
-               "0011111111111100",
-               "0011111111110000",
-               "1111111111110000",
-               "1111111111000000",
-               "1111111111000000",
-               "1111111100000000",
-               "1111111100000000",
-               "1111111111000000",
-               "1111111111000000",
-               "1111111111110000",
-               "0011111111110000",
-               "0011111111111100",
-               "0000111111110000",
-               "0000001111000000"))
+spritedata = ( (960, 4080, 16380, 16380, 65535, 65535, 65535, 65535,
+                65535, 65535, 65535, 65535, 16380, 16380, 4080, 960),
+               (960, 960, 4080, 16380, 16380, 65535, 65520, 65472,
+                65280, 65280, 65472, 65520, 65535, 16380, 4080, 960),
+               (960, 4080, 16380, 16368, 65520, 65472, 65472, 65280,
+                65280, 65472, 65472, 65520, 16368, 16380, 4080, 960) )
 
 COLORS = {"cxblue"       : (0, 0, 170),
           "cxwhite"      : (255, 255, 255),
           "packieyellow" : (238, 238, 119),
           "transparent"  : (0, 0, 0, 0) }
 
-
 class InputHandler:
 
     def __init__(self, hasjoystick):
         self.hasjoystick = hasjoystick
+
+        self.data = { pygame.K_LEFT   : "left", pygame.K_RIGHT : "right",
+                      pygame.K_UP     : "up",   pygame.K_DOWN  : "down",
+                      pygame.K_LCTRL  : "fire", pygame.K_q     : "quit",
+                      pygame.K_ESCAPE : "quit" }
+
+        self.datakeys = self.data.keys()
+        self.datavalues = self.data.values()
+
         self.joystick = {}
         if self.hasjoystick:
             self.initJoystick()
@@ -95,31 +59,33 @@ class InputHandler:
     def initJoystick(self):
         self.js = pygame.joystick.Joystick(0)
         self.js.init()
-        for i in ("left", "right", "up", "down", "firing"):
+        for i in self.datavalues:
+            if i == "quit":
+                continue
             self.joystick[i] = False
 
     def initKeys(self):
-        self.keys_ = {}
-        for i in (pygame.K_LEFT, pygame.K_RIGHT,
-                  pygame.K_UP, pygame.K_DOWN, pygame.K_LCTRL,
-                  pygame.K_q, pygame.K_ESCAPE):
-            self.keys_[i] = False
+        self.keypresses = {}
+        for i in self.datakeys:
+            self.keypresses[i] = False
 
     def processEvents(self):
+        actions = {"left" : False, "right" : False, "up" : False, "down" : False,
+                   "fire" : False, "quit" : False}
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-                for i in self.keys_:
+                for i in self.keypresses:
                     if event.key == i:
-                        self.keys_[i] = True
+                        self.keypresses[i] = True
             if event.type == pygame.KEYUP:
-                for i in self.keys_:
+                for i in self.keypresses:
                     if event.key == i:
-                        self.keys_[i] = False
+                        self.keypresses[i] = False
             if self.hasjoystick:
                 if event.type == pygame.JOYBUTTONDOWN:
-                    self.joystick["firing"] = True
+                    self.joystick["fire"] = True
                 if event.type == pygame.JOYBUTTONUP:
-                    self.joystick["firing"] = False
+                    self.joystick["fire"] = False
                 if event.type == pygame.JOYAXISMOTION:
                     # Joystick pushed:
                     if event.axis == 0 and int(event.value) == -1:
@@ -137,19 +103,17 @@ class InputHandler:
                     if event.axis == 1 and int(event.value) == 0:
                         self.joystick["up"] = False
                         self.joystick["down"] = False
-        actions = []
-        if self.keys_[pygame.K_LEFT] or self.hasjoystick and self.joystick["left"]:
-            actions.append("left")
-        if self.keys_[pygame.K_RIGHT] or self.hasjoystick and self.joystick["right"]:
-            actions.append("right")
-        if self.keys_[pygame.K_UP] or self.hasjoystick and self.joystick["up"]:
-            actions.append("up")
-        if self.keys_[pygame.K_DOWN] or self.hasjoystick and self.joystick["down"]:
-            actions.append("down")
-        if self.keys_[pygame.K_LCTRL] or self.hasjoystick and self.joystick["firing"]:
-            actions.append("firing")
-        if self.keys_[pygame.K_q] or self.keys_[pygame.K_ESCAPE]:
-            actions.append("quit")
+
+        # Same indentation level as "for event in pygame.event.get()":
+        for i in self.datakeys:
+            if self.keypresses[i]:
+                actions[self.data[i]] = True
+        if self.hasjoystick:
+            for i in self.datavalues:
+                if i == "quit":
+                    continue
+                if self.joystick[i]:
+                    actions[i] = True
         return actions
 
 
@@ -187,52 +151,54 @@ class ImageCreator:
         pointrect = Rect((0, 0), (SCALEFACTOR, SCALEFACTOR))
         # They are sprites of 16x16 pixels:
         for y in range(16):
+            b = format(data[y], '016b')
             for x in range(16):
-                if data[y][x] == "1":
+                if b[x] == "1":
                     pointrect.topleft = (x * SCALEFACTOR, y * SCALEFACTOR)
                     pygame.draw.rect(surface, COLORS["packieyellow"], pointrect)
         return surface
 
-    def getArray(self, a):
+    def getArraysOfSingleBinaryNumbers(self, a):
         b = []
         for i in a:
+            n = format(i, '016b')
             c = []
-            for u in i:
+            for u in n:
                 c.append(u)
             b.append(c)
         return b
 
-    def getStringArray(self, a):
+    def getArrayOfDigitalNumbers(self, a):
         b = []
         for i in a:
-            b.append("".join(i))
+            b.append(int("".join(i), 2))
         return b
 
     def turnLeft(self, a):
-        a = self.getArray(a)
+        a = self.getArraysOfSingleBinaryNumbers(a)
         b = []
         for i in range(15, -1, -1):
             c = []
             for u in range(16):
                 c.append(a[u][i])
             b.append(c)
-        return self.getStringArray(b)
+        return self.getArrayOfDigitalNumbers(b)
 
     def turnRight(self, a):
-        a = self.getArray(a)
+        a = self.getArraysOfSingleBinaryNumbers(a)
         b = []
         for i in range(16):
             c = []
             for u  in range(15, -1, -1):
                 c.append(a[u][i])
             b.append(c)
-        return self.getStringArray(b)
+        return self.getArrayOfDigitalNumbers(b)
 
     def mirror(self, b):
-        b = self.getArray(b)
+        b = self.getArraysOfSingleBinaryNumbers(b)
         for i in b:
             i.reverse()
-        return self.getStringArray(b)
+        return self.getArrayOfDigitalNumbers(b)
 
 
 class Packie:
@@ -251,36 +217,16 @@ class Packie:
         self.images = ic.getImages()
         self.rect   = self.images["right"][0].get_rect()
 
-    def moveLeft(self):
-        self.direction = "left"
-        self.x -= SCALEFACTOR
-        self.rect.topleft = (self.x, self.y)
-        self.framestate += 1
-        if self.framestate > 2:
-            self.nextFrame()
-            self.framestate = 0
-
-    def moveRight(self):
-        self.direction = "right"
-        self.x += SCALEFACTOR
-        self.rect.topleft = (self.x, self.y)
-        self.framestate += 1
-        if self.framestate > 2:
-            self.nextFrame()
-            self.framestate = 0
-
-    def moveUp(self):
-        self.direction = "up"
-        self.y -= SCALEFACTOR
-        self.rect.topleft = (self.x, self.y)
-        self.framestate += 1
-        if self.framestate > 2:
-            self.nextFrame()
-            self.framestate = 0
-
-    def moveDown(self):
-        self.direction = "down"
-        self.y += SCALEFACTOR
+    def move(self, direction):
+        self.direction = direction
+        if self.direction == "left":
+            self.x -= SCALEFACTOR
+        if self.direction == "right":
+            self.x += SCALEFACTOR
+        if self.direction == "up":
+            self.y -= SCALEFACTOR
+        if self.direction == "down":
+            self.y += SCALEFACTOR
         self.rect.topleft = (self.x, self.y)
         self.framestate += 1
         if self.framestate > 2:
@@ -334,21 +280,16 @@ class Main:
 
     def checkInput(self):
         actions = self.ih.processEvents()
-        if "left" in actions:
-            self.packie.moveLeft()
-            return
-        if "right" in actions:
-            self.packie.moveRight()
-            return
-        if "up" in actions:
-            self.packie.moveUp()
-            return
-        if "down" in actions:
-            self.packie.moveDown()
-            return
-        if "quit" in actions:
-            pygame.quit()
-            return "quit"
+        for i in actions.keys():
+            if i == "quit" and actions[i]:
+                pygame.quit()
+                return "quit"
+            if i == "fire" and actions[i]:
+                self.packie.fire()
+                continue
+            if actions[i]:
+                self.packie.move(i)
+                return
         return 0
 
 if __name__ == '__main__':
