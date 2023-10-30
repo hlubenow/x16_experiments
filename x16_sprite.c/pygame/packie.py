@@ -285,7 +285,6 @@ class Main:
                 pygame.quit()
                 return "quit"
             if i == "fire" and actions[i]:
-                self.packie.fire()
                 continue
             if actions[i]:
                 self.packie.move(i)
